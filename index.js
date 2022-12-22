@@ -6,8 +6,6 @@ const stripe = require("stripe")(process.env.SECRET_REACT_KEY);
 const port = process.env.PORT || 5000;
 const app = express();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-
-
 //Middle War
 app.use(cors());
 app.use(express.json());
@@ -50,6 +48,7 @@ async function runDB() {
       }
       next();
     };
+    // Booking Slot and get Date//
     app.get("/appointmentOptions", async (req, res) => {
       const date = req.query.date;
       const query = {};
@@ -101,13 +100,30 @@ async function runDB() {
       }
       res.send({ failed: "UnAuthorized Access" });
     });
+    app.put('/updateStatus/:id',async(req,res)=>{
+      const {id} = req.params
+      const status = req.body.status
+      const updateStatus = {
+        $set: {
+          status: status,
+        },
+      };
+      const result = await bookingsCollection.updateOne(
+        { _id: ObjectId(id) },
+        updateStatus
+      );
+      res.send(result);
+    })
     app.post("/bookings", async (req, res) => {
       const booking = req.body;
       // When i get same data from database, i prevent this function
       const query = {
-        Cellphone:booking.Cellphone
-      };
+        appointmentDate: booking.appointmentDate,
+        email: booking.email,
+        treatment: booking.treatment
+    }
       const alreadyBooked = await bookingsCollection.find(query).toArray();
+      
       if (alreadyBooked.length) {
         return res.send({
           success: false,
@@ -136,7 +152,7 @@ async function runDB() {
       const result = await userCollection.find(query).toArray();
       res.send(result);
     });
-    app.get("/bookings", JwtVerify, verifyAdmin, async (req, res) => {
+    app.get("/bookings", JwtVerify, async (req, res) => {
       const email = req.query.email;
       const decodedEmail = req.decoded.email;
       if (email !== decodedEmail) {
@@ -162,12 +178,10 @@ async function runDB() {
       const { price } = booking;
       const amount = parseFloat(price) * 100;
       const paymentIntent = await stripe.paymentIntents.create({
-        currency:'usd',
-        amount:amount,
-        "payment_method_types":[
-          "card"
-        ]
-      })
+        currency: "usd",
+        amount: amount,
+        payment_method_types: ["card"],
+      });
       res.send({
         clientSecret: paymentIntent.client_secret,
       });
